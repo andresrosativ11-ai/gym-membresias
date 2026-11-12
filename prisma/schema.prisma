@@ -1,0 +1,223 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  RECEPTION
+}
+
+enum CheckInMethod {
+  QR
+  CODE
+  MANUAL
+}
+
+enum CheckInResult {
+  ALLOWED
+  DENIED_EXPIRED
+  DENIED_SUSPENDED
+  DENIED_NO_MEMBERSHIP
+  DENIED_INACTIVE
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  OTHER
+}
+
+enum NotificationType {
+  EXPIRING_SOON
+  EXPIRED
+}
+
+enum NotificationChannel {
+  EMAIL
+  WHATSAPP
+}
+
+/// Personal del gimnasio (quienes inician sesión).
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  role         Role
+  passwordHash String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  memberships Membership[]
+  checkIns    CheckIn[]
+  payments    Payment[]
+}
+
+model Member {
+  id             String    @id @default(cuid())
+  /// Código corto y legible para teclear en recepción.
+  memberNumber   Int       @unique @default(autoincrement())
+  /// Token opaco que va dentro del QR (regenerable).
+  accessCode     String    @unique
+  firstName      String
+  lastName       String
+  documentId     String?   @unique
+  email          String?
+  phone          String?
+  birthDate      DateTime? @db.Date
+  photoKey       String?
+  enrolledAt     DateTime  @db.Date
+  suspendedAt    DateTime?
+  suspendReason  String?
+  /// Baja lógica.
+  deletedAt      DateTime?
+  /// Desnormalizado: fin de la membresía más reciente (para filtros rápidos).
+  currentEndDate DateTime? @db.Date
+  notes          String?
+  /// Nombre, documento y email normalizados (minúsculas, sin acentos) para búsqueda.
+  searchText     String    @default("")
+  /// Consentimiento explícito para recibir avisos por WhatsApp.
+  notifyWhatsapp Boolean   @default(false)
+  /// Consentimiento explícito para recibir avisos por email.
+  notifyEmail    Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  memberships Membership[]
+  checkIns    CheckIn[]
+  payments    Payment[]
+
+  @@index([currentEndDate])
+  @@index([lastName, firstName])
+}
+
+model Plan {
+  id             String   @id @default(cuid())
+  name           String
+  durationMonths Int?
+  durationDays   Int?
+  priceCents     Int
+  currency       String   @default("MXN")
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  benefits    PlanBenefit[]
+  memberships Membership[]
+}
+
+model Benefit {
+  id    String        @id @default(cuid())
+  key   String        @unique
+  label String
+  plans PlanBenefit[]
+}
+
+model PlanBenefit {
+  planId    String
+  benefitId String
+  /// Detalle opcional (ej. "8 clases/mes"); null = incluido sin límite.
+  value     String?
+
+  plan    Plan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  benefit Benefit @relation(fields: [benefitId], references: [id], onDelete: Cascade)
+
+  @@id([planId, benefitId])
+}
+
+/// Un periodo asignado/pagado.
+model Membership {
+  id          String   @id @default(cuid())
+  memberId    String
+  planId      String
+  startDate   DateTime @db.Date
+  endDate     DateTime @db.Date
+  /// Snapshot del precio al momento de la asignación.
+  priceCents  Int
+  paymentId   String?  @unique
+  createdById String
+  createdAt   DateTime @default(now())
+  /// Anulada por error (se conserva para auditoría; no cuenta para el vencimiento).
+  voidedAt    DateTime?
+
+  member    Member   @relation(fields: [memberId], references: [id])
+  plan      Plan     @relation(fields: [planId], references: [id])
+  payment   Payment? @relation(fields: [paymentId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  @@index([memberId, endDate])
+}
+
+/// Fase 2.
+model Payment {
+  id           String        @id @default(cuid())
+  memberId     String
+  amountCents  Int
+  method       PaymentMethod
+  paidAt       DateTime
+  reference    String?
+  receivedById String
+  voidedAt     DateTime?
+  createdAt    DateTime      @default(now())
+
+  member     Member      @relation(fields: [memberId], references: [id])
+  receivedBy User        @relation(fields: [receivedById], references: [id])
+  membership Membership?
+
+  @@index([paidAt])
+}
+
+model CheckIn {
+  id       String        @id @default(cuid())
+  memberId String?
+  method   CheckInMethod
+  result   CheckInResult
+  at       DateTime      @default(now())
+  staffId  String
+
+  member Member? @relation(fields: [memberId], references: [id])
+  staff  User    @relation(fields: [staffId], references: [id])
+
+  @@index([at])
+  @@index([memberId, at])
+}
+
+/// Garantiza envíos idempotentes: una fila por (membresía, tipo, canal).
+/// status: SENDING (reclamado) · SENT · FAILED (reintentable hasta 3 intentos)
+model NotificationLog {
+  id                String              @id @default(cuid())
+  membershipId      String
+  memberId          String?
+  type              NotificationType
+  channel           NotificationChannel
+  status            String
+  error             String?
+  attempts          Int                 @default(1)
+  providerMessageId String?
+  sentAt            DateTime            @default(now())
+  updatedAt         DateTime            @default(now()) @updatedAt
+
+  @@unique([membershipId, type, channel])
+  @@index([memberId])
+  @@index([sentAt])
+}
+
+/// Fila única de configuración.
+model Settings {
+  id               Int    @id @default(1)
+  gymName          String @default("Mi Gimnasio")
+  timezone         String @default("America/Mexico_City")
+  expiringSoonDays Int    @default(5)
+  currency         String @default("MXN")
+  /// Envío automático de avisos por WhatsApp (además requiere credenciales en el entorno).
+  whatsappEnabled  Boolean @default(false)
+  /// Código de país para teléfonos guardados sin él (ej. "52" México).
+  countryCode      String  @default("52")
+  /// Envío automático de avisos por email (además requiere credenciales en el entorno).
+  emailEnabled     Boolean @default(false)
+}
