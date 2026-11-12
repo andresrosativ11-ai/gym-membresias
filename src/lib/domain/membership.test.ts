@@ -69,3 +69,12 @@ describe("computeNewPeriod", () => {
     expect(second).toEqual({ startDate: "2026-03-01", endDate: "2026-03-31" });
   });
 });
+
+describe("computeNewPeriod con fecha de pago anterior", () => {
+  it("socio que pagó el 1 sin membresía previa vence según esa fecha", () => {
+    expect(computeNewPeriod(null, "2026-11-01", { durationMonths: 1 })).toEqual({
+      startDate: "2026-11-01",
+      endDate: "2026-11-30",
+    });
+  });
+});

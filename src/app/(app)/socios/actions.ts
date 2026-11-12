@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { FormState } from "@/components/action-form";
 import { db } from "@/lib/db";
-import { dbDateFromIso, isoFromDbDate } from "@/lib/domain/dates";
+import { addDays, dbDateFromIso, isoFromDbDate } from "@/lib/domain/dates";
 import { computeNewPeriod } from "@/lib/domain/membership";
 import { buildMemberSearchText } from "@/lib/domain/search";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -121,12 +121,16 @@ export async function assignPlan(memberId: string, _prev: FormState, fd: FormDat
     amountCents: fd.get("amount") ?? "",
     method: fd.get("method") ?? "",
     reference: fd.get("reference") ?? "",
+    paidDate: fd.get("paidDate") ?? "",
   });
   if (!parsed.success) return { error: firstError(parsed.error) };
   const input = parsed.data;
   const plan = await db.plan.findFirst({ where: { id: input.planId, active: true } });
   if (!plan) return { error: "Selecciona un plan válido" };
   const today = await gymToday();
+  const paidDate = input.paidDate ?? today;
+  if (paidDate > today) return { error: "La fecha del pago no puede ser futura" };
+  if (paidDate < addDays(today, -366)) return { error: "La fecha del pago es demasiado antigua" };
 
   try {
     const period = await db.$transaction(async (tx) => {
@@ -136,14 +140,17 @@ export async function assignPlan(memberId: string, _prev: FormState, fd: FormDat
       if (!member || member.deletedAt) throw new DomainError("Socio no encontrado o dado de baja");
 
       const current = member.currentEndDate ? isoFromDbDate(member.currentEndDate) : null;
-      const p = computeNewPeriod(current, today, plan);
+      // El periodo arranca en la fecha real del pago (puede ser anterior a hoy).
+      const p = computeNewPeriod(current, paidDate, plan);
       const payment = await tx.payment.create({
         data: {
           memberId,
           amountCents: input.amountCents,
           method: input.method,
           reference: input.reference,
-          paidAt: new Date(),
+          // Pago de hoy: hora exacta. Pago anterior: mediodía UTC de ese día
+          // (cae en el mismo día calendario en América).
+          paidAt: paidDate === today ? new Date() : new Date(`${paidDate}T12:00:00Z`),
           receivedById: user.id,
         },
       });

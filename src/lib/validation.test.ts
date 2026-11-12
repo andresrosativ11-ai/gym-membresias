@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { firstError, memberSchema } from "./validation";
+import { firstError, memberSchema, paymentSchema } from "./validation";
 
 const base = {
   firstName: "Ana",
@@ -46,5 +46,18 @@ describe("memberSchema", () => {
   it("rechaza email mal formado", () => {
     const r = memberSchema.safeParse({ ...base, email: "ana@" });
     expect(r.success).toBe(false);
+  });
+});
+
+describe("paymentSchema.paidDate", () => {
+  const pay = { planId: "p1", amountCents: "20", method: "CASH", reference: "" };
+  it("vacío = hoy (null)", () => {
+    expect(paymentSchema.parse({ ...pay, paidDate: "" }).paidDate).toBeNull();
+  });
+  it("acepta una fecha anterior", () => {
+    expect(paymentSchema.parse({ ...pay, paidDate: "2026-11-01" }).paidDate).toBe("2026-11-01");
+  });
+  it("rechaza formato inválido", () => {
+    expect(paymentSchema.safeParse({ ...pay, paidDate: "01/11/2026" }).success).toBe(false);
   });
 });

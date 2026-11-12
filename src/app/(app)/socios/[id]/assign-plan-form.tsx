@@ -29,8 +29,10 @@ export function AssignPlanForm({
 }) {
   const [planId, setPlanId] = useState(plans[0]?.id ?? "");
   const [amount, setAmount] = useState(plans[0]?.priceInput ?? "");
+  const [paidDate, setPaidDate] = useState<ISODate>(today);
   const plan = plans.find((p) => p.id === planId);
-  const preview = plan ? computeNewPeriod(currentEndDate, today, plan) : null;
+  const baseDate = paidDate && paidDate <= today ? paidDate : today;
+  const preview = plan ? computeNewPeriod(currentEndDate, baseDate, plan) : null;
 
   if (plans.length === 0) {
     return <p className="text-sm text-zinc-500">No hay planes activos. Un administrador debe crearlos.</p>;
@@ -41,10 +43,13 @@ export function AssignPlanForm({
       action={action}
       className="space-y-3"
       resetOnSuccess
+      onSuccess={() => setPaidDate(today)}
       confirmMessage={(fd) =>
         `¿Cobrar $${fd.get("amount")} (${plan?.name ?? "plan"}) con ${
           PAYMENT_METHOD_LABEL[String(fd.get("method"))] ?? "otro método"
-        } y renovar hasta ${preview ? formatDate(preview.endDate) : "—"}?`
+        }${baseDate !== today ? ` pagado el ${formatDate(baseDate)}` : ""} y renovar hasta ${
+          preview ? formatDate(preview.endDate) : "—"
+        }?`
       }
     >
       <div>
@@ -71,7 +76,7 @@ export function AssignPlanForm({
       {preview && (
         <p className="text-sm text-zinc-600">
           Periodo: <strong>{formatDate(preview.startDate)}</strong> → <strong>{formatDate(preview.endDate)}</strong>
-          {currentEndDate && currentEndDate >= today && " (se suma a la membresía vigente)"}
+          {currentEndDate && currentEndDate >= baseDate && " (se suma a la membresía vigente)"}
         </p>
       )}
       <div className="grid grid-cols-2 gap-3">
@@ -101,6 +106,21 @@ export function AssignPlanForm({
             ))}
           </select>
         </div>
+      </div>
+      <div>
+        <label className="field-label" htmlFor="paidDate">
+          Fecha del pago <span className="font-normal text-zinc-500">(cámbiala si pagó antes de hoy)</span>
+        </label>
+        <input
+          id="paidDate"
+          name="paidDate"
+          type="date"
+          required
+          max={today}
+          value={paidDate}
+          onChange={(e) => setPaidDate(e.target.value)}
+          className="field-input"
+        />
       </div>
       <div>
         <label className="field-label" htmlFor="reference">

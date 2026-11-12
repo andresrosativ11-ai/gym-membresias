@@ -73,6 +73,12 @@ export const paymentSchema = z.object({
     .pipe(z.number().max(100_000_000, "Monto demasiado alto")),
   method: z.enum(PAYMENT_METHODS, { errorMap: () => ({ message: "Elige el método de pago" }) }),
   reference: optionalText.pipe(z.string().max(100, "Referencia demasiado larga").nullable()),
+  /** Fecha real del pago (YYYY-MM-DD). Vacío = hoy. Permite registrar pagos hechos antes. */
+  paidDate: z
+    .string()
+    .trim()
+    .transform((v) => (v === "" ? null : v))
+    .pipe(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha de pago inválida").nullable()),
 });
 
 export const settingsSchema = z.object({

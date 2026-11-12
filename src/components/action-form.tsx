@@ -16,12 +16,15 @@ export function ActionForm({
   children,
   className,
   resetOnSuccess = false,
+  onSuccess,
   confirmMessage,
 }: {
   action: Action;
   children: React.ReactNode;
   className?: string;
   resetOnSuccess?: boolean;
+  /** Se llama tras un envío exitoso (ej. para reiniciar campos controlados). */
+  onSuccess?: () => void;
   /** Si se indica, pide confirmación antes de enviar (ej. cobros). */
   confirmMessage?: (fd: FormData) => string;
 }) {
@@ -29,8 +32,11 @@ export function ActionForm({
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    if (state.ok && resetOnSuccess) formRef.current?.reset();
-  }, [state, resetOnSuccess]);
+    if (!state.ok) return;
+    if (resetOnSuccess) formRef.current?.reset();
+    onSuccess?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al cambiar el resultado
+  }, [state]);
 
   return (
     <form
