@@ -25,7 +25,7 @@ export default async function CheckInPage({ searchParams }: { searchParams: Prom
     take: 8,
     include: { member: { select: { id: true, firstName: true, lastName: true } } },
   });
-  const time = new Intl.DateTimeFormat("es-MX", { timeZone: settings.timezone, timeStyle: "short" });
+  const time = new Intl.DateTimeFormat("es-VE", { timeZone: settings.timezone, timeStyle: "short" });
 
   return (
     <div className="space-y-4">

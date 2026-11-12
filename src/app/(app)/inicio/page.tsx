@@ -46,7 +46,7 @@ export default async function InicioPage() {
       view.status === "VENCIDO"
         ? `Hola ${m.firstName}, tu membresía en ${settings.gymName} venció el ${formatDate(view.endDate)}. ¡Te esperamos para renovar!`
         : `Hola ${m.firstName}, tu membresía en ${settings.gymName} vence el ${formatDate(view.endDate)}. ¡Renueva para no perder tu acceso!`;
-    return whatsappLink(m.phone, msg);
+    return whatsappLink(m.phone, msg, settings.countryCode);
   };
 
   const renderList = (rows: typeof expiring, empty: string) =>
@@ -124,7 +124,7 @@ export default async function InicioPage() {
       </section>
 
       <p className="text-xs text-zinc-500">
-        El botón de WhatsApp abre un mensaje prellenado; el teléfono debe incluir el código de país (ej. +52).
+        El botón de WhatsApp abre un mensaje prellenado; a los números locales (ej. 0412 123 4567) se les agrega el código de país configurado en Avisos.
       </p>
     </div>
   );

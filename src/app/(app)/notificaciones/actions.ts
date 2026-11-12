@@ -9,7 +9,7 @@ import { requireAdmin } from "@/lib/session";
 export async function saveNotificationSettings(_prev: FormState, fd: FormData): Promise<FormState> {
   await requireAdmin();
   const countryCode = String(fd.get("countryCode") ?? "").replace(/\D/g, "");
-  if (!/^\d{1,4}$/.test(countryCode)) return { error: "Código de país inválido (ej. 52 para México)" };
+  if (!/^\d{1,4}$/.test(countryCode)) return { error: "Código de país inválido (ej. 58 para Venezuela)" };
   const data = {
     whatsappEnabled: fd.get("whatsappEnabled") === "on",
     emailEnabled: fd.get("emailEnabled") === "on",

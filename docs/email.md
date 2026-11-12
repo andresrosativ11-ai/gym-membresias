@@ -33,7 +33,7 @@ Reinicia la app después de cambiarlas.
 3. Marca "Acepta recibir avisos por email" en los socios que lo aceptaron.
 4. **Vista previa** → **activa "Enviar avisos por email cada día"** → Guardar.
 
-El cron diario (`vercel.json`, 15:00 UTC) envía ambos canales en la misma ejecución.
+El cron diario (`vercel.json`, 13:00 UTC = 9:00 en Caracas) envía ambos canales en la misma ejecución.
 
 ## Garantías
 

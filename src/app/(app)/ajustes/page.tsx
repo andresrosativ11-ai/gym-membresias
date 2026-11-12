@@ -6,6 +6,7 @@ import { getSettings } from "@/lib/settings";
 import { createStaff, setStaffActive, updateSettings } from "./actions";
 
 const TIMEZONES = [
+  "America/Caracas",
   "America/Mexico_City",
   "America/Monterrey",
   "America/Cancun",
@@ -14,7 +15,6 @@ const TIMEZONES = [
   "America/Bogota",
   "America/Lima",
   "America/Guayaquil",
-  "America/Caracas",
   "America/Santiago",
   "America/Argentina/Buenos_Aires",
   "America/Montevideo",
@@ -29,7 +29,7 @@ const TIMEZONES = [
   "Europe/Madrid",
 ];
 
-const CURRENCIES = ["MXN", "USD", "COP", "PEN", "CLP", "ARS", "UYU", "PYG", "BOB", "GTQ", "CRC", "PAB", "DOP", "EUR"];
+const CURRENCIES = ["USD", "VES", "MXN", "COP", "PEN", "CLP", "ARS", "UYU", "PYG", "BOB", "GTQ", "CRC", "PAB", "DOP", "EUR"];
 
 export default async function AjustesPage() {
   const me = await requireAdmin();

@@ -1,7 +1,8 @@
 import type { ISODate } from "./domain/dates";
+import { normalizeWhatsappNumber } from "./domain/notifications";
 
 export function formatMoney(cents: number, currency: string): string {
-  return new Intl.NumberFormat("es-MX", { style: "currency", currency }).format(cents / 100);
+  return new Intl.NumberFormat("es-VE", { style: "currency", currency, currencyDisplay: "narrowSymbol" }).format(cents / 100);
 }
 
 export function formatDate(date: ISODate | null | undefined): string {
@@ -11,7 +12,7 @@ export function formatDate(date: ISODate | null | undefined): string {
 }
 
 export function formatDateTime(date: Date, timeZone: string): string {
-  return new Intl.DateTimeFormat("es-MX", {
+  return new Intl.DateTimeFormat("es-VE", {
     timeZone,
     dateStyle: "short",
     timeStyle: "short",
@@ -27,10 +28,13 @@ export function formatBucketLabel(key: ISODate, unit: "day" | "month"): string {
   return unit === "day" ? `${Number(d)} ${month}` : `${month} ${y}`;
 }
 
-/** Enlace de WhatsApp (solo dígitos; requiere código de país en el teléfono). */
-export function whatsappLink(phone: string, message: string): string | null {
-  const digits = phone.replace(/\D/g, "");
-  if (digits.length < 8) return null;
+/**
+ * Enlace de WhatsApp. Acepta teléfonos locales ("0412 123 4567") y les antepone
+ * el código de país configurado, igual que los avisos automáticos.
+ */
+export function whatsappLink(phone: string, message: string, countryCode: string): string | null {
+  const digits = normalizeWhatsappNumber(phone, countryCode);
+  if (!digits) return null;
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
 

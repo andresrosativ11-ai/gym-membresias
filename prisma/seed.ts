@@ -6,6 +6,10 @@ const db = new PrismaClient();
 async function main() {
   const email = (process.env.SEED_ADMIN_EMAIL ?? "admin@gym.local").toLowerCase();
   const password = process.env.SEED_ADMIN_PASSWORD ?? "cambiar-esta-clave";
+  // En Vercel la app es pública: nunca crear el admin con la clave de ejemplo.
+  if (process.env.VERCEL && (!process.env.SEED_ADMIN_PASSWORD || password === "cambiar-esta-clave" || password.length < 10)) {
+    throw new Error("Configura SEED_ADMIN_PASSWORD (mínimo 10 caracteres) en las variables de entorno de Vercel.");
+  }
 
   await db.settings.upsert({ where: { id: 1 }, update: {}, create: { id: 1 } });
 
@@ -32,7 +36,7 @@ async function main() {
       data: {
         name: "Mensual",
         durationMonths: 1,
-        priceCents: 50000,
+        priceCents: 3000,
         benefits: { create: [{ benefitId: id("gym") }] },
       },
     });
@@ -40,7 +44,7 @@ async function main() {
       data: {
         name: "Trimestral",
         durationMonths: 3,
-        priceCents: 135000,
+        priceCents: 8000,
         benefits: { create: [{ benefitId: id("gym") }, { benefitId: id("classes"), value: "8 clases/mes" }] },
       },
     });
@@ -48,7 +52,7 @@ async function main() {
       data: {
         name: "Anual",
         durationMonths: 12,
-        priceCents: 480000,
+        priceCents: 30000,
         benefits: {
           create: [{ benefitId: id("gym") }, { benefitId: id("classes") }, { benefitId: id("locker") }],
         },

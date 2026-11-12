@@ -16,7 +16,7 @@ describe("getWhatsAppConfig", () => {
   it("valores por defecto", () => {
     expect(cfg).toMatchObject({
       apiVersion: "v23.0",
-      language: "es_MX",
+      language: "es",
       templates: { EXPIRING_SOON: "membresia_por_vencer", EXPIRED: "membresia_vencida" },
     });
   });

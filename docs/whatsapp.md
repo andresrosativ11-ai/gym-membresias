@@ -29,7 +29,7 @@ Cada socio recibe **como máximo un aviso de cada tipo por membresía**, y solo 
 En WhatsApp Manager → *Message templates* → *Create template*:
 
 - **Categoría:** Utility (recordatorio de una cuenta/servicio existente).
-- **Idioma:** Spanish (MEX) → código `es_MX`. Si eliges otro, ponlo en `WHATSAPP_TEMPLATE_LANG`.
+- **Idioma:** Spanish → código `es` (el predeterminado). Si eliges otra variante (ej. `es_MX`, `es_ES`), ponla en `WHATSAPP_TEMPLATE_LANG`.
 - **Variables:** exactamente 3, en este orden: `{{1}}` nombre, `{{2}}` gimnasio, `{{3}}` fecha (dd/mm/aaaa).
 
 **`membresia_por_vencer`**
@@ -52,7 +52,7 @@ WHATSAPP_PHONE_NUMBER_ID="1234..."  # Phone number ID (no el teléfono)
 CRON_SECRET="..."                   # openssl rand -base64 32
 # opcionales
 WHATSAPP_API_VERSION="v23.0"        # versión de Graph API; actualízala según el changelog de Meta
-WHATSAPP_TEMPLATE_LANG="es_MX"
+WHATSAPP_TEMPLATE_LANG="es"
 ```
 
 Reinicia la app después de cambiarlas.
@@ -69,7 +69,7 @@ Reinicia la app después de cambiarlas.
 
 ## 5. Envío diario (cron)
 
-`vercel.json` programa `GET /api/cron/notifications` todos los días a las **15:00 UTC** (9:00 en Ciudad de México).
+`vercel.json` programa `GET /api/cron/notifications` todos los días a las **13:00 UTC** (9:00 en Caracas).
 Cambia `schedule` si tu zona horaria es otra. Vercel envía `Authorization: Bearer $CRON_SECRET` automáticamente.
 
 Fuera de Vercel, cualquier cron sirve:

@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "db:dev": "prisma dev -n gym -d"
+    "db:dev": "prisma dev -n gym -d",
+    "postinstall": "prisma generate",
+    "vercel-build": "prisma generate && prisma migrate deploy && tsx prisma/seed.ts && next build"
   },
   "dependencies": {
     "@date-fns/tz": "^1.5.0",

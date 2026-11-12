@@ -4,7 +4,9 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
+  url       = env("DATABASE_URL")
+  /// Conexión directa (sin pooler) para migraciones. En Vercel+Neon la crea la integración.
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 enum Role {
@@ -102,7 +104,7 @@ model Plan {
   durationMonths Int?
   durationDays   Int?
   priceCents     Int
-  currency       String   @default("MXN")
+  currency       String   @default("USD")
   active         Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -211,13 +213,21 @@ model NotificationLog {
 model Settings {
   id               Int    @id @default(1)
   gymName          String @default("Mi Gimnasio")
-  timezone         String @default("America/Mexico_City")
+  timezone         String @default("America/Caracas")
   expiringSoonDays Int    @default(5)
-  currency         String @default("MXN")
+  currency         String @default("USD")
   /// Envío automático de avisos por WhatsApp (además requiere credenciales en el entorno).
   whatsappEnabled  Boolean @default(false)
-  /// Código de país para teléfonos guardados sin él (ej. "52" México).
-  countryCode      String  @default("52")
+  /// Código de país para teléfonos guardados sin él (ej. "58" Venezuela).
+  countryCode      String  @default("58")
   /// Envío automático de avisos por email (además requiere credenciales en el entorno).
   emailEnabled     Boolean @default(false)
+}
+
+/// Fotos de socios. La key (uuid.ext) es la que guarda Member.photoKey.
+model Photo {
+  key         String   @id
+  contentType String
+  data        Bytes
+  createdAt   DateTime @default(now())
 }

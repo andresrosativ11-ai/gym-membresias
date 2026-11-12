@@ -131,7 +131,7 @@ export default async function NotificacionesPage() {
           <p className="text-xs text-zinc-500">
             Envía la plantilla estándar <code>hello_world</code>.
           </p>
-          <input name="phone" type="tel" inputMode="tel" placeholder="+52 55 1234 5678" className="field-input" />
+          <input name="phone" type="tel" inputMode="tel" placeholder="0412 123 4567" className="field-input" />
           <SubmitButton className="btn-secondary w-full" pendingText="Enviando…">
             Enviar prueba
           </SubmitButton>

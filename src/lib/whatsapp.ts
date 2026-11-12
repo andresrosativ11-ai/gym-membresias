@@ -6,7 +6,7 @@
  *   WHATSAPP_TOKEN            token de acceso (usuario del sistema, permanente)
  *   WHATSAPP_PHONE_NUMBER_ID  ID del número emisor (no el número en sí)
  *   WHATSAPP_API_VERSION      opcional, ej. "v23.0"
- *   WHATSAPP_TEMPLATE_LANG    opcional, código de idioma de las plantillas (ej. "es_MX")
+ *   WHATSAPP_TEMPLATE_LANG    opcional, código de idioma de las plantillas (ej. "es")
  *   WHATSAPP_TEMPLATE_EXPIRING / WHATSAPP_TEMPLATE_EXPIRED  opcional, nombres de plantilla
  */
 import type { NotificationKind, SendResult } from "./domain/notifications";
@@ -30,7 +30,7 @@ export function getWhatsAppConfig(env: Record<string, string | undefined> = proc
     token,
     phoneNumberId,
     apiVersion,
-    language: env.WHATSAPP_TEMPLATE_LANG?.trim() || "es_MX",
+    language: env.WHATSAPP_TEMPLATE_LANG?.trim() || "es",
     templates: {
       EXPIRING_SOON: env.WHATSAPP_TEMPLATE_EXPIRING?.trim() || "membresia_por_vencer",
       EXPIRED: env.WHATSAPP_TEMPLATE_EXPIRED?.trim() || "membresia_vencida",

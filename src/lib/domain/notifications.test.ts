@@ -17,6 +17,13 @@ describe("normalizeWhatsappNumber", () => {
   it("quita el prefijo troncal 0 nacional", () => {
     expect(normalizeWhatsappNumber("011 1234 5678", "54")).toBe("541112345678");
   });
+  it("acepta celulares venezolanos en sus formatos habituales", () => {
+    expect(normalizeWhatsappNumber("0412 123 4567", "58")).toBe("584121234567");
+    expect(normalizeWhatsappNumber("0414-1234567", "58")).toBe("584141234567");
+    expect(normalizeWhatsappNumber("4241234567", "58")).toBe("584241234567");
+    expect(normalizeWhatsappNumber("+58 416 123 4567", "58")).toBe("584161234567");
+    expect(normalizeWhatsappNumber("584261234567", "58")).toBe("584261234567");
+  });
   it("rechaza números imposibles", () => {
     expect(normalizeWhatsappNumber("123", "52")).toBeNull();
     expect(normalizeWhatsappNumber("", "52")).toBeNull();

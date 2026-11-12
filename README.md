@@ -69,8 +69,8 @@ prisma/              schema, migraciones y seed
 ## Producción
 
 - `DATABASE_URL` de un Postgres administrado (Neon / Supabase). **Quitar** `pgbouncer=true&connection_limit=1`, que solo hace falta con el servidor local de `prisma dev`.
-- Las fotos se guardan en disco (`STORAGE_DIR`); en Vercel/serverless hay que cambiar `src/lib/storage.ts` a R2/S3 (misma interfaz).
-- `npx prisma migrate deploy && npm run db:seed` en el primer despliegue.
+- Las fotos de los socios se guardan en la base de datos (tabla `Photo`), así que funcionan igual en local y en Vercel.
+- Guía paso a paso para publicar: [`docs/deploy.md`](docs/deploy.md) (Vercel + Neon; migraciones y seed corren solos en `vercel-build`).
 - WhatsApp: `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` (pasos en [docs/whatsapp.md](docs/whatsapp.md)).
 - Email: `RESEND_API_KEY`, `EMAIL_FROM` (pasos en [docs/email.md](docs/email.md)).
 - `CRON_SECRET` para el cron diario de avisos (`vercel.json`), que envía ambos canales.
