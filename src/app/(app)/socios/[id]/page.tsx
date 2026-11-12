@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- QR en data URL */
 import Link from "next/link";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 import { ConfirmButton } from "@/components/action-form";
@@ -7,7 +8,15 @@ import { Avatar } from "@/components/avatar";
 import { StatusBadge } from "@/components/status-badge";
 import { db } from "@/lib/db";
 import { isoFromDbDate, todayInTimeZone } from "@/lib/domain/dates";
-import { formatDate, formatDateTime, formatMoney, PAYMENT_METHOD_LABEL, planDurationLabel } from "@/lib/format";
+import { portalInviteMessage, portalUrl } from "@/lib/domain/portal";
+import {
+  formatDate,
+  formatDateTime,
+  formatMoney,
+  PAYMENT_METHOD_LABEL,
+  planDurationLabel,
+  whatsappLink,
+} from "@/lib/format";
 import { memberView } from "@/lib/members";
 import { requireUser } from "@/lib/session";
 import { getSettings } from "@/lib/settings";
@@ -60,6 +69,14 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
   const view = memberView(m, today, settings.expiringSoonDays);
   const qr = await QRCode.toDataURL(m.accessCode, { margin: 1, width: 320 });
   const hasActiveRenewal = m.memberships.some((ms) => !ms.voidedAt);
+
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const portal = portalUrl(`${proto}://${host}`, m.accessCode);
+  const inviteLink = m.phone
+    ? whatsappLink(m.phone, portalInviteMessage(m.firstName, settings.gymName, portal), settings.countryCode)
+    : null;
 
   return (
     <div className="space-y-4">
@@ -119,6 +136,29 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
           </a>
         </div>
       </section>
+
+      {!m.deletedAt && (
+        <section className="card space-y-2 text-sm">
+          <h2 className="font-semibold">Portal del socio</h2>
+          <p className="text-zinc-600">
+            Enlace personal donde el socio ve su membresía, sus pagos y su QR, sin contraseña. Si se filtra, usa
+            «Regenerar QR»: el enlace anterior deja de funcionar.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {inviteLink ? (
+              <a href={inviteLink} target="_blank" rel="noopener noreferrer" className="btn-primary">
+                Enviar acceso por WhatsApp
+              </a>
+            ) : (
+              <span className="text-zinc-500">Agrega un teléfono para enviarlo por WhatsApp.</span>
+            )}
+            <a href={portal} target="_blank" rel="noopener noreferrer" className="btn-secondary">
+              Ver portal
+            </a>
+          </div>
+          <p className="break-all rounded bg-zinc-50 p-2 font-mono text-xs text-zinc-600 select-all">{portal}</p>
+        </section>
+      )}
 
       <section className="card text-sm">
         <h2 className="mb-2 font-semibold">Datos</h2>
@@ -241,7 +281,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
           )}
           <div className="flex flex-wrap gap-2">
             <form action={regenerateAccessCode.bind(null, id)}>
-              <ConfirmButton message="El QR actual dejará de funcionar. ¿Continuar?">Regenerar QR</ConfirmButton>
+              <ConfirmButton message="El QR actual y el enlace del portal dejarán de funcionar. ¿Continuar?">Regenerar QR</ConfirmButton>
             </form>
             {hasActiveRenewal && (
               <form action={voidLastMembership.bind(null, id)}>
