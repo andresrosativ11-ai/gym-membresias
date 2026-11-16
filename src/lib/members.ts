@@ -2,7 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { addDays, dbDateFromIso, isoFromDbDate, type ISODate } from "./domain/dates";
-import { computeStatus } from "./domain/membership";
+import { computeStatus, type StatusInput } from "./domain/membership";
 import { normalizeSearch } from "./domain/search";
 import { photoUrl } from "./storage";
 
@@ -10,7 +10,9 @@ export const MEMBER_FILTERS = [
   "todos",
   "vigentes",
   "por_vencer",
+  "inactivos",
   "vencidos",
+  "congelados",
   "suspendidos",
   "sin_membresia",
   "bajas",
@@ -21,7 +23,9 @@ export const FILTER_LABEL: Record<MemberFilter, string> = {
   todos: "Todos",
   vigentes: "Vigentes",
   por_vencer: "Por vencer",
+  inactivos: "Inactivos",
   vencidos: "Vencidos",
+  congelados: "Congelados",
   suspendidos: "Suspendidos",
   sin_membresia: "Sin membresía",
   bajas: "Bajas",
@@ -38,6 +42,8 @@ export function parseIsoParam(value: string | undefined): ISODate | undefined {
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value ? value : undefined;
 }
 
+export const DEFAULT_INACTIVE_DAYS = 10;
+
 export type EnrolledRange = { from?: ISODate; to?: ISODate };
 
 /** Traduce un filtro de estado + texto de búsqueda + rango de inscripción a un WHERE de Prisma. */
@@ -46,16 +52,27 @@ export function memberWhere(
   q: string | undefined,
   today: ISODate,
   expiringSoonDays: number,
-  enrolled: EnrolledRange = {},
+  options: { enrolled?: EnrolledRange; inactiveDays?: number } = {},
 ): Prisma.MemberWhereInput {
+  const { enrolled = {}, inactiveDays = DEFAULT_INACTIVE_DAYS } = options;
   const t = dbDateFromIso(today);
   const soon = dbDateFromIso(addDays(today, expiringSoonDays));
-  const live = { deletedAt: null, suspendedAt: null };
+  const live = { deletedAt: null, suspendedAt: null, frozenSince: null };
+  // Medianoche UTC del día de corte: diferencia de pocas horas con la hora local, irrelevante en una ventana de días.
+  const inactiveCutoff = dbDateFromIso(addDays(today, -inactiveDays));
   const byFilter: Record<MemberFilter, Prisma.MemberWhereInput> = {
     todos: { deletedAt: null },
     vigentes: { ...live, currentEndDate: { gte: t } },
     por_vencer: { ...live, currentEndDate: { gte: t, lte: soon } },
+    inactivos: {
+      ...live,
+      currentEndDate: { gte: t },
+      // Los recién inscritos aún no cuentan como inactivos.
+      enrolledAt: { lte: inactiveCutoff },
+      checkIns: { none: { result: "ALLOWED", at: { gte: inactiveCutoff } } },
+    },
     vencidos: { ...live, currentEndDate: { lt: t } },
+    congelados: { deletedAt: null, suspendedAt: null, frozenSince: { not: null } },
     suspendidos: { deletedAt: null, suspendedAt: { not: null } },
     sin_membresia: { ...live, currentEndDate: null },
     bajas: { deletedAt: { not: null } },
@@ -89,15 +106,23 @@ type MemberRow = {
   suspendedAt: Date | null;
   deletedAt: Date | null;
   currentEndDate: Date | null;
+  frozenSince: Date | null;
 };
 
+/** Datos de la fila de BD que necesita el cálculo de estado. */
+export function statusInput(m: Pick<MemberRow, "suspendedAt" | "deletedAt" | "currentEndDate" | "frozenSince">): StatusInput {
+  return {
+    suspendedAt: m.suspendedAt,
+    deletedAt: m.deletedAt,
+    currentEndDate: m.currentEndDate ? isoFromDbDate(m.currentEndDate) : null,
+    frozenSince: m.frozenSince ? isoFromDbDate(m.frozenSince) : null,
+  };
+}
+
 export function memberView(m: MemberRow, today: ISODate, expiringSoonDays: number) {
-  const endDate = m.currentEndDate ? isoFromDbDate(m.currentEndDate) : null;
-  const { status, daysLeft } = computeStatus(
-    { suspendedAt: m.suspendedAt, deletedAt: m.deletedAt, currentEndDate: endDate },
-    today,
-    expiringSoonDays,
-  );
+  const input = statusInput(m);
+  const endDate = input.currentEndDate;
+  const { status, daysLeft } = computeStatus(input, today, expiringSoonDays);
   return {
     id: m.id,
     memberNumber: m.memberNumber,

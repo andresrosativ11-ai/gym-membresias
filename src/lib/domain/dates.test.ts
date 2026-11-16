@@ -75,3 +75,17 @@ describe("isoFromDbDate", () => {
     expect(isoFromDbDate(new Date("2026-11-11T00:00:00Z"))).toBe("2026-11-11");
   });
 });
+
+import { startOfDayInTimeZone } from "./dates";
+
+describe("startOfDayInTimeZone", () => {
+  it("Caracas (UTC-4): medianoche local son las 04:00 UTC", () => {
+    expect(startOfDayInTimeZone("2026-11-16", "America/Caracas").toISOString()).toBe("2026-11-16T04:00:00.000Z");
+  });
+  it("UTC sin desfase", () => {
+    expect(startOfDayInTimeZone("2026-01-01", "UTC").toISOString()).toBe("2026-01-01T00:00:00.000Z");
+  });
+  it("zona al este de UTC (Madrid, invierno UTC+1)", () => {
+    expect(startOfDayInTimeZone("2026-01-15", "Europe/Madrid").toISOString()).toBe("2026-01-14T23:00:00.000Z");
+  });
+});

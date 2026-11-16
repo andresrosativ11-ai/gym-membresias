@@ -5,6 +5,7 @@ const STYLES: Record<MemberStatus, string> = {
   POR_VENCER: "bg-amber-100 text-amber-800",
   VENCIDO: "bg-red-100 text-red-800",
   SUSPENDIDO: "bg-zinc-800 text-white",
+  CONGELADO: "bg-sky-100 text-sky-800",
   SIN_MEMBRESIA: "bg-zinc-100 text-zinc-600",
   BAJA: "bg-zinc-200 text-zinc-500 line-through",
 };

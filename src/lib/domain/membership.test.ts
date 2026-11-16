@@ -4,7 +4,7 @@ import { computeNewPeriod, computeStatus } from "./membership";
 const TODAY = "2026-11-11";
 
 describe("computeStatus", () => {
-  const base = { suspendedAt: null, deletedAt: null, currentEndDate: null };
+  const base = { suspendedAt: null, deletedAt: null, currentEndDate: null, frozenSince: null };
 
   it("sin membresía", () => {
     expect(computeStatus(base, TODAY, 5)).toEqual({ status: "SIN_MEMBRESIA", daysLeft: null });

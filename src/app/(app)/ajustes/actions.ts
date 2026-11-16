@@ -42,6 +42,7 @@ export async function updateSettings(_prev: FormState, fd: FormData): Promise<Fo
     timezone: fd.get("timezone") ?? "",
     currency: String(fd.get("currency") ?? "").toUpperCase(),
     expiringSoonDays: fd.get("expiringSoonDays") ?? "",
+    inactiveDays: fd.get("inactiveDays") ?? "",
   });
   if (!parsed.success) return { error: firstError(parsed.error) };
 

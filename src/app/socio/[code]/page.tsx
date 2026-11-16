@@ -78,6 +78,11 @@ export default async function PortalSocioPage({ params }: { params: Promise<{ co
         {view.status === "SUSPENDIDO" && (
           <p className="text-sm text-zinc-600">Tu acceso está suspendido. Consulta en recepción.</p>
         )}
+        {view.status === "CONGELADO" && (
+          <p className="text-sm text-zinc-600">
+            Tu membresía está congelada: tus días no corren. Al volver, avisa en recepción para reactivarla.
+          </p>
+        )}
       </section>
 
       <section className="card flex flex-col items-center gap-2 text-center">

@@ -93,6 +93,7 @@ export const settingsSchema = z.object({
   }, "Zona horaria inválida"),
   currency: z.string().regex(/^[A-Z]{3}$/, "Moneda inválida (código ISO, ej. USD)"),
   expiringSoonDays: z.coerce.number().int().min(1, "Mínimo 1 día").max(30, "Máximo 30 días"),
+  inactiveDays: z.coerce.number().int().min(3, "Inactivo: mínimo 3 días").max(90, "Inactivo: máximo 90 días"),
 });
 
 export const staffSchema = z.object({

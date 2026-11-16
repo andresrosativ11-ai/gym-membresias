@@ -100,6 +100,23 @@ export default async function AjustesPage() {
             />
             <p className="mt-1 text-xs text-zinc-500">días antes del vencimiento</p>
           </div>
+          <div>
+            <label className="field-label" htmlFor="inactiveDays">
+              Socio &quot;inactivo&quot;
+            </label>
+            <input
+              id="inactiveDays"
+              name="inactiveDays"
+              type="number"
+              min={3}
+              max={90}
+              inputMode="numeric"
+              required
+              defaultValue={s.inactiveDays}
+              className="field-input"
+            />
+            <p className="mt-1 text-xs text-zinc-500">días sin venir (con membresía vigente)</p>
+          </div>
         </div>
         <p className="text-xs text-zinc-500">
           Cambiar la moneda solo cambia el símbolo mostrado; no convierte precios ni pagos ya registrados.

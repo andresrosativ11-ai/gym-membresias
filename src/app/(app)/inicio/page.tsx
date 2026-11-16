@@ -21,10 +21,11 @@ export default async function InicioPage() {
   const expiredWhere = {
     deletedAt: null,
     suspendedAt: null,
+    frozenSince: null,
     currentEndDate: { gte: dbDateFromIso(addDays(today, -RECENT_EXPIRED_DAYS)), lt: dbDateFromIso(today) },
   };
 
-  const [expiring, expired, todayStats] = await Promise.all([
+  const [expiring, expired, todayStats, inactiveCount] = await Promise.all([
     db.member.findMany({
       where: memberWhere("por_vencer", undefined, today, soon),
       orderBy: { currentEndDate: "asc" },
@@ -37,6 +38,7 @@ export default async function InicioPage() {
           WHERE result = 'ALLOWED' AND ((at AT TIME ZONE 'UTC') AT TIME ZONE ${tz})::date = ${today}::date) AS entries,
         (SELECT COALESCE(SUM("amountCents"), 0)::float8 FROM "Payment"
           WHERE "voidedAt" IS NULL AND (("paidAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz})::date = ${today}::date) AS revenue`,
+    db.member.count({ where: memberWhere("inactivos", undefined, today, soon, { inactiveDays: settings.inactiveDays }) }),
   ]);
   const stats = todayStats[0] ?? { entries: 0, revenue: 0 };
 
@@ -102,6 +104,19 @@ export default async function InicioPage() {
         <StatTile label="Vencidos" value={String(expired.length)} hint={`últimos ${RECENT_EXPIRED_DAYS} días`} />
         {isAdmin && <StatTile label="Ingresos hoy" value={formatMoney(stats.revenue, settings.currency)} />}
       </div>
+
+      {inactiveCount > 0 && (
+        <Link
+          href="/socios?estado=inactivos"
+          className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+        >
+          <span>
+            <strong>{inactiveCount}</strong> {inactiveCount === 1 ? "socio vigente no viene" : "socios vigentes no vienen"}{" "}
+            hace {settings.inactiveDays} días o más
+          </span>
+          <span aria-hidden>→</span>
+        </Link>
+      )}
 
       <section className="space-y-2">
         <div className="flex items-baseline justify-between">

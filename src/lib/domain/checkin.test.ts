@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { evaluateAccess, isDuplicateCheckIn } from "./checkin";
 
 const TODAY = "2026-11-11";
-const base = { suspendedAt: null, deletedAt: null, currentEndDate: "2026-12-01" };
+const base = { suspendedAt: null, deletedAt: null, currentEndDate: "2026-12-01", frozenSince: null };
 
 describe("evaluateAccess", () => {
   it("permite socio activo", () => {

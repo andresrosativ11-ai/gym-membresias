@@ -15,7 +15,9 @@ const entradas = (n: number) => `${n} ${n === 1 ? "entrada" : "entradas"}`;
 const SNAPSHOT: { filter: MemberFilter; label: string }[] = [
   { filter: "vigentes", label: "Vigentes" },
   { filter: "por_vencer", label: "Por vencer" },
+  { filter: "inactivos", label: "Inactivos" },
   { filter: "vencidos", label: "Vencidos" },
+  { filter: "congelados", label: "Congelados" },
   { filter: "suspendidos", label: "Suspendidos" },
   { filter: "sin_membresia", label: "Sin membresía" },
 ];
@@ -37,7 +39,7 @@ export default async function ReportesPage({
     revenueReport(period, tz),
     attendanceReport(period, tz),
     Promise.all(
-      SNAPSHOT.map((s) => db.member.count({ where: memberWhere(s.filter, undefined, today, settings.expiringSoonDays) })),
+      SNAPSHOT.map((s) => db.member.count({ where: memberWhere(s.filter, undefined, today, settings.expiringSoonDays, { inactiveDays: settings.inactiveDays }) })),
     ),
   ]);
 

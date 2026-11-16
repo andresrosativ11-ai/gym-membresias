@@ -45,6 +45,21 @@ export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   OTHER: "Otro",
 };
 
+export const CHECKIN_RESULT_LABEL: Record<string, string> = {
+  ALLOWED: "Permitido",
+  DENIED_EXPIRED: "Rechazado: vencido",
+  DENIED_SUSPENDED: "Rechazado: suspendido",
+  DENIED_NO_MEMBERSHIP: "Rechazado: sin membresía",
+  DENIED_INACTIVE: "Rechazado: baja",
+  DENIED_FROZEN: "Rechazado: congelada",
+};
+
+export const CHECKIN_METHOD_LABEL: Record<string, string> = {
+  QR: "QR",
+  CODE: "Nº de socio",
+  MANUAL: "Búsqueda",
+};
+
 export function planDurationLabel(plan: { durationMonths: number | null; durationDays: number | null }): string {
   if (plan.durationMonths) return plan.durationMonths === 1 ? "1 mes" : `${plan.durationMonths} meses`;
   if (plan.durationDays) return plan.durationDays === 1 ? "1 día" : `${plan.durationDays} días`;

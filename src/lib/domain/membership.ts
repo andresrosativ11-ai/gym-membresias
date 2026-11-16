@@ -1,11 +1,20 @@
 import { addDays, daysBetween, periodEnd, type ISODate, type PlanDuration } from "./dates";
 
-export type MemberStatus = "ACTIVO" | "POR_VENCER" | "VENCIDO" | "SUSPENDIDO" | "SIN_MEMBRESIA" | "BAJA";
+export type MemberStatus =
+  | "ACTIVO"
+  | "POR_VENCER"
+  | "VENCIDO"
+  | "SUSPENDIDO"
+  | "CONGELADO"
+  | "SIN_MEMBRESIA"
+  | "BAJA";
 
 export type StatusInput = {
   suspendedAt: Date | null;
   deletedAt: Date | null;
   currentEndDate: ISODate | null;
+  /** Congelada desde esta fecha (los días no corren). */
+  frozenSince: ISODate | null;
 };
 
 export type StatusResult = {
@@ -19,6 +28,11 @@ export function computeStatus(member: StatusInput, today: ISODate, expiringSoonD
   const daysLeft = member.currentEndDate ? daysBetween(today, member.currentEndDate) : null;
   if (member.deletedAt) return { status: "BAJA", daysLeft };
   if (member.suspendedAt) return { status: "SUSPENDIDO", daysLeft };
+  if (member.frozenSince) {
+    // Mientras está congelada, los días restantes quedan fijos en los que tenía al congelar.
+    const frozenLeft = member.currentEndDate ? daysBetween(member.frozenSince, member.currentEndDate) : null;
+    return { status: "CONGELADO", daysLeft: frozenLeft };
+  }
   if (daysLeft === null) return { status: "SIN_MEMBRESIA", daysLeft };
   if (daysLeft < 0) return { status: "VENCIDO", daysLeft };
   if (daysLeft <= expiringSoonDays) return { status: "POR_VENCER", daysLeft };
@@ -45,6 +59,7 @@ export const STATUS_LABEL: Record<MemberStatus, string> = {
   POR_VENCER: "Por vencer",
   VENCIDO: "Vencido",
   SUSPENDIDO: "Suspendido",
+  CONGELADO: "Congelado",
   SIN_MEMBRESIA: "Sin membresía",
   BAJA: "Baja",
 };

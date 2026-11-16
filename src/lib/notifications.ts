@@ -87,6 +87,8 @@ export async function runNotifications({ dryRun }: { dryRun: boolean }): Promise
     where: {
       deletedAt: null,
       suspendedAt: null,
+      // Congelada: el vencimiento se va a correr, no hay que avisar.
+      frozenSince: null,
       currentEndDate: {
         gte: dbDateFromIso(addDays(today, -EXPIRED_WINDOW_DAYS)),
         lte: dbDateFromIso(addDays(today, soon)),

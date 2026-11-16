@@ -45,7 +45,12 @@ export default async function CheckInPage({ searchParams }: { searchParams: Prom
       <CheckInPanel />
 
       <section className="card text-sm">
-        <h2 className="mb-2 font-semibold">Últimos registros</h2>
+        <div className="mb-2 flex items-baseline justify-between">
+          <h2 className="font-semibold">Últimos registros</h2>
+          <Link href="/checkin/historial" className="text-zinc-500 underline">
+            Ver historial
+          </Link>
+        </div>
         {recent.length === 0 ? (
           <p className="text-zinc-500">Aún no hay entradas.</p>
         ) : (

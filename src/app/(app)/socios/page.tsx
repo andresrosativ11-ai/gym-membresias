@@ -3,6 +3,7 @@ import { Avatar } from "@/components/avatar";
 import { StatusBadge } from "@/components/status-badge";
 import { db } from "@/lib/db";
 import { isoFromDbDate, todayInTimeZone } from "@/lib/domain/dates";
+import { daysSinceVisit } from "@/lib/domain/freeze";
 import { formatDate } from "@/lib/format";
 import {
   FILTER_LABEL,
@@ -37,7 +38,8 @@ export default async function SociosPage({
   const enrolled = { from: desde, to: hasta };
   const hasDateFilter = Boolean(desde || hasta);
 
-  const where = memberWhere(filter, q, today, soon, enrolled);
+  const opts = { enrolled, inactiveDays: settings.inactiveDays };
+  const where = memberWhere(filter, q, today, soon, opts);
   const [total, rows, counts] = await Promise.all([
     db.member.count({ where }),
     db.member.findMany({
@@ -45,10 +47,22 @@ export default async function SociosPage({
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
+      include: {
+        checkIns: { where: { result: "ALLOWED" }, orderBy: { at: "desc" }, take: 1, select: { at: true } },
+      },
     }),
-    Promise.all(MEMBER_FILTERS.map((f) => db.member.count({ where: memberWhere(f, undefined, today, soon, enrolled) }))),
+    Promise.all(MEMBER_FILTERS.map((f) => db.member.count({ where: memberWhere(f, undefined, today, soon, opts) }))),
   ]);
-  const members = rows.map((m) => ({ ...memberView(m, today, soon), enrolledAt: isoFromDbDate(m.enrolledAt) }));
+  const members = rows.map((m) => {
+    const last = m.checkIns[0]?.at;
+    return {
+      ...memberView(m, today, soon),
+      enrolledAt: isoFromDbDate(m.enrolledAt),
+      sinceVisit: daysSinceVisit(last ? todayInTimeZone(settings.timezone, last) : null, today),
+    };
+  });
+  const visitLabel = (d: number | null) =>
+    d === null ? "nunca vino" : d === 0 ? "vino hoy" : `última visita hace ${d} ${d === 1 ? "día" : "días"}`;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const href = (params: { estado?: MemberFilter; page?: number; sinFechas?: boolean }) => {
@@ -137,6 +151,13 @@ export default async function SociosPage({
         ))}
       </nav>
 
+      {filter === "inactivos" && (
+        <p className="text-xs text-zinc-500">
+          Socios con membresía vigente que no han venido en los últimos {settings.inactiveDays} días (se cambia en
+          Ajustes).
+        </p>
+      )}
+
       {members.length === 0 ? (
         <p className="card text-center text-sm text-zinc-500">No hay socios que coincidan.</p>
       ) : (
@@ -148,7 +169,13 @@ export default async function SociosPage({
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{m.fullName}</p>
                   <p className="text-xs text-zinc-500">
-                    #{m.memberNumber} · inscrito {formatDate(m.enrolledAt)} · vence {formatDate(m.endDate)}
+                    #{m.memberNumber} ·{" "}
+                    {filter === "inactivos" ? (
+                      <span className="text-amber-700">{visitLabel(m.sinceVisit)}</span>
+                    ) : (
+                      <>inscrito {formatDate(m.enrolledAt)}</>
+                    )}{" "}
+                    · vence {formatDate(m.endDate)}
                   </p>
                 </div>
                 <StatusBadge status={m.status} daysLeft={m.daysLeft} />

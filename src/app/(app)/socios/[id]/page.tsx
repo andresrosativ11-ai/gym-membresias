@@ -3,13 +3,15 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
-import { ConfirmButton } from "@/components/action-form";
+import { ActionForm, ConfirmButton, SubmitButton } from "@/components/action-form";
 import { Avatar } from "@/components/avatar";
 import { StatusBadge } from "@/components/status-badge";
 import { db } from "@/lib/db";
 import { isoFromDbDate, todayInTimeZone } from "@/lib/domain/dates";
+import { canFreeze, daysSinceVisit, frozenDays } from "@/lib/domain/freeze";
 import { portalInviteMessage, portalUrl } from "@/lib/domain/portal";
 import {
+  CHECKIN_RESULT_LABEL,
   formatDate,
   formatDateTime,
   formatMoney,
@@ -22,20 +24,15 @@ import { requireUser } from "@/lib/session";
 import { getSettings } from "@/lib/settings";
 import {
   assignPlan,
+  freezeMember,
   regenerateAccessCode,
+  unfreezeMember,
   setDeleted,
   setSuspended,
   voidLastMembership,
 } from "../actions";
 import { AssignPlanForm } from "./assign-plan-form";
 
-const RESULT_LABEL: Record<string, string> = {
-  ALLOWED: "Permitido",
-  DENIED_EXPIRED: "Rechazado: vencido",
-  DENIED_SUSPENDED: "Rechazado: suspendido",
-  DENIED_NO_MEMBERSHIP: "Rechazado: sin membresía",
-  DENIED_INACTIVE: "Rechazado: baja",
-};
 
 export default async function SocioPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -50,6 +47,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       include: {
         memberships: { include: { plan: true }, orderBy: [{ endDate: "desc" }, { createdAt: "desc" }], take: 12 },
         checkIns: { orderBy: { at: "desc" }, take: 10 },
+        freezes: { orderBy: { startDate: "desc" }, take: 10 },
         payments: {
           orderBy: { paidAt: "desc" },
           take: 12,
@@ -69,6 +67,13 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
   const view = memberView(m, today, settings.expiringSoonDays);
   const qr = await QRCode.toDataURL(m.accessCode, { margin: 1, width: 320 });
   const hasActiveRenewal = m.memberships.some((ms) => !ms.voidedAt);
+  const frozenSince = m.frozenSince ? isoFromDbDate(m.frozenSince) : null;
+  const daysFrozen = frozenSince ? frozenDays(frozenSince, today) : 0;
+  const [lastVisit, totalVisits] = await Promise.all([
+    db.checkIn.findFirst({ where: { memberId: id, result: "ALLOWED" }, orderBy: { at: "desc" }, select: { at: true } }),
+    db.checkIn.count({ where: { memberId: id, result: "ALLOWED" } }),
+  ]);
+  const sinceVisit = daysSinceVisit(lastVisit ? todayInTimeZone(settings.timezone, lastVisit.at) : null, today);
 
   const h = await headers();
   const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
@@ -96,6 +101,21 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
           {m.suspendedAt && m.suspendReason && (
             <p className="mt-1 text-sm text-zinc-600">Motivo: {m.suspendReason}</p>
           )}
+          {frozenSince && (
+            <p className="mt-1 text-sm text-sky-800">
+              Congelada desde el {formatDate(frozenSince)} ({daysFrozen} {daysFrozen === 1 ? "día" : "días"})
+              {m.frozenReason && ` · ${m.frozenReason}`}
+            </p>
+          )}
+          <p className="mt-1 text-xs text-zinc-500">
+            Última visita:{" "}
+            {sinceVisit === null
+              ? "nunca"
+              : sinceVisit === 0
+                ? "hoy"
+                : `hace ${sinceVisit} ${sinceVisit === 1 ? "día" : "días"}`}{" "}
+            · {totalVisits} {totalVisits === 1 ? "entrada" : "entradas"} en total
+          </p>
         </div>
       </section>
 
@@ -105,7 +125,16 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         </Link>
       </div>
 
-      {!m.deletedAt && (
+      {!m.deletedAt && frozenSince && (
+        <section className="card text-sm">
+          <h2 className="mb-1 font-semibold">Cobrar y renovar</h2>
+          <p className="text-zinc-600">
+            La membresía está congelada. Descongélala (en Administración) antes de cobrar una renovación.
+          </p>
+        </section>
+      )}
+
+      {!m.deletedAt && !frozenSince && (
         <section className="card">
           <h2 className="mb-3 font-semibold">Cobrar y renovar</h2>
           <AssignPlanForm
@@ -248,8 +277,32 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
         )}
       </section>
 
+      {m.freezes.length > 0 && (
+        <section className="card text-sm">
+          <h2 className="mb-2 font-semibold">Congelamientos</h2>
+          <ul className="divide-y divide-zinc-100">
+            {m.freezes.map((f) => (
+              <li key={f.id} className="py-2">
+                <p>
+                  {formatDate(isoFromDbDate(f.startDate))} → {formatDate(isoFromDbDate(f.endDate))} ·{" "}
+                  <strong>
+                    +{f.days} {f.days === 1 ? "día" : "días"}
+                  </strong>
+                </p>
+                {f.reason && <p className="text-xs text-zinc-500">{f.reason}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="card text-sm">
-        <h2 className="mb-2 font-semibold">Últimas entradas</h2>
+        <div className="mb-2 flex items-baseline justify-between">
+          <h2 className="font-semibold">Últimas entradas</h2>
+          <Link href={`/checkin/historial?socio=${id}`} className="text-zinc-500 underline">
+            Ver todas
+          </Link>
+        </div>
         {m.checkIns.length === 0 ? (
           <p className="text-zinc-500">Sin registros.</p>
         ) : (
@@ -258,7 +311,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
               <li key={c.id} className="flex justify-between py-2">
                 <span>{formatDateTime(c.at, settings.timezone)}</span>
                 <span className={c.result === "ALLOWED" ? "text-green-700" : "text-red-700"}>
-                  {RESULT_LABEL[c.result]}
+                  {CHECKIN_RESULT_LABEL[c.result]}
                 </span>
               </li>
             ))}
@@ -269,6 +322,25 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
       {isAdmin && (
         <section className="card space-y-3 text-sm">
           <h2 className="font-semibold">Administración</h2>
+          {frozenSince ? (
+            <ActionForm action={unfreezeMember.bind(null, id)} className="space-y-2">
+              <p className="text-zinc-600">
+                Al descongelar hoy, el vencimiento se corre {daysFrozen} {daysFrozen === 1 ? "día" : "días"}.
+              </p>
+              <SubmitButton className="btn-primary" pendingText="Descongelando…">
+                Descongelar membresía
+              </SubmitButton>
+            </ActionForm>
+          ) : (
+            canFreeze(view.status) && (
+              <ActionForm action={freezeMember.bind(null, id)} className="flex gap-2">
+                <input name="reason" placeholder="Motivo (viaje, lesión…)" className="field-input" maxLength={200} />
+                <ConfirmButton message="¿Congelar la membresía desde hoy? No podrá entrar y los días dejan de correr hasta descongelarla.">
+                  Congelar
+                </ConfirmButton>
+              </ActionForm>
+            )
+          )}
           {m.suspendedAt ? (
             <form action={setSuspended.bind(null, id, false)}>
               <button className="btn-secondary">Reactivar (quitar suspensión)</button>

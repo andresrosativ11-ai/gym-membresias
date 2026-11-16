@@ -90,3 +90,22 @@ export function isoFromDbDate(date: Date): ISODate {
 export function dbDateFromIso(date: ISODate): Date {
   return toUtc(date);
 }
+
+/** Instante UTC en que empieza el día `date` en la zona horaria indicada (ej. 00:00 en Caracas = 04:00 UTC). */
+export function startOfDayInTimeZone(date: ISODate, timeZone: string): Date {
+  const utcMidnight = toUtc(date);
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(utcMidnight);
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value);
+  const wallAsUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+  const offset = wallAsUtc - utcMidnight.getTime();
+  return new Date(utcMidnight.getTime() - offset);
+}

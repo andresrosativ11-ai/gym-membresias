@@ -26,6 +26,7 @@ enum CheckInResult {
   DENIED_SUSPENDED
   DENIED_NO_MEMBERSHIP
   DENIED_INACTIVE
+  DENIED_FROZEN
 }
 
 enum PaymentMethod {
@@ -58,6 +59,7 @@ model User {
   memberships Membership[]
   checkIns    CheckIn[]
   payments    Payment[]
+  freezes     MembershipFreeze[]
 }
 
 model Member {
@@ -76,6 +78,9 @@ model Member {
   enrolledAt     DateTime  @db.Date
   suspendedAt    DateTime?
   suspendReason  String?
+  /// Membresía congelada desde esta fecha (los días no corren hasta descongelar).
+  frozenSince    DateTime? @db.Date
+  frozenReason   String?
   /// Baja lógica.
   deletedAt      DateTime?
   /// Desnormalizado: fin de la membresía más reciente (para filtros rápidos).
@@ -93,6 +98,7 @@ model Member {
   memberships Membership[]
   checkIns    CheckIn[]
   payments    Payment[]
+  freezes     MembershipFreeze[]
 
   @@index([currentEndDate])
   @@index([lastName, firstName])
@@ -222,6 +228,25 @@ model Settings {
   countryCode      String  @default("58")
   /// Envío automático de avisos por email (además requiere credenciales en el entorno).
   emailEnabled     Boolean @default(false)
+  /// Días sin venir para considerar "inactivo" a un socio vigente.
+  inactiveDays     Int     @default(10)
+}
+
+/// Historial de congelamientos ya terminados (cuántos días se corrió el vencimiento).
+model MembershipFreeze {
+  id          String   @id @default(cuid())
+  memberId    String
+  startDate   DateTime @db.Date
+  endDate     DateTime @db.Date
+  days        Int
+  reason      String?
+  createdById String
+  createdAt   DateTime @default(now())
+
+  member    Member @relation(fields: [memberId], references: [id])
+  createdBy User   @relation(fields: [createdById], references: [id])
+
+  @@index([memberId, startDate])
 }
 
 /// Fotos de socios. La key (uuid.ext) es la que guarda Member.photoKey.

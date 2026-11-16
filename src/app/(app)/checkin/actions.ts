@@ -2,9 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { isoFromDbDate, todayInTimeZone } from "@/lib/domain/dates";
+import { todayInTimeZone } from "@/lib/domain/dates";
 import { evaluateAccess, isDuplicateCheckIn } from "@/lib/domain/checkin";
-import { memberView, memberWhere, type MemberView } from "@/lib/members";
+import { memberView, memberWhere, statusInput, type MemberView } from "@/lib/members";
 import { requireUser } from "@/lib/session";
 import { getSettings } from "@/lib/settings";
 import { checkInSchema } from "@/lib/validation";
@@ -37,15 +37,7 @@ export async function checkInAction(input: unknown): Promise<CheckInResponse> {
 
   const settings = await getSettings();
   const today = todayInTimeZone(settings.timezone);
-  const decision = evaluateAccess(
-    {
-      suspendedAt: member.suspendedAt,
-      deletedAt: member.deletedAt,
-      currentEndDate: member.currentEndDate ? isoFromDbDate(member.currentEndDate) : null,
-    },
-    today,
-    settings.expiringSoonDays,
-  );
+  const decision = evaluateAccess(statusInput(member), today, settings.expiringSoonDays);
 
   // Evita registrar dos veces el mismo QR escaneado seguido.
   let duplicate = false;

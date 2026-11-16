@@ -6,7 +6,8 @@ export type CheckInResult =
   | "DENIED_EXPIRED"
   | "DENIED_SUSPENDED"
   | "DENIED_NO_MEMBERSHIP"
-  | "DENIED_INACTIVE";
+  | "DENIED_INACTIVE"
+  | "DENIED_FROZEN";
 
 export type AccessDecision = {
   allowed: boolean;
@@ -21,6 +22,8 @@ export function evaluateAccess(member: StatusInput, today: ISODate, expiringSoon
       return { allowed: false, result: "DENIED_INACTIVE", message: "Socio dado de baja" };
     case "SUSPENDIDO":
       return { allowed: false, result: "DENIED_SUSPENDED", message: "Membresía suspendida" };
+    case "CONGELADO":
+      return { allowed: false, result: "DENIED_FROZEN", message: "Membresía congelada" };
     case "SIN_MEMBRESIA":
       return { allowed: false, result: "DENIED_NO_MEMBERSHIP", message: "No tiene membresía asignada" };
     case "VENCIDO": {

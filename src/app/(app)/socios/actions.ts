@@ -5,12 +5,13 @@ import { redirect } from "next/navigation";
 import type { FormState } from "@/components/action-form";
 import { db } from "@/lib/db";
 import { addDays, dbDateFromIso, isoFromDbDate } from "@/lib/domain/dates";
-import { computeNewPeriod } from "@/lib/domain/membership";
+import { canFreeze, frozenDays, shiftPeriod } from "@/lib/domain/freeze";
+import { computeNewPeriod, computeStatus } from "@/lib/domain/membership";
 import { buildMemberSearchText } from "@/lib/domain/search";
 import { formatDate, formatMoney } from "@/lib/format";
-import { isUniqueViolation, newAccessCode } from "@/lib/members";
+import { isUniqueViolation, newAccessCode, statusInput } from "@/lib/members";
 import { requireAdmin, requireUser } from "@/lib/session";
-import { gymToday } from "@/lib/settings";
+import { getSettings, gymToday } from "@/lib/settings";
 import { deletePhoto, PhotoError, savePhoto } from "@/lib/storage";
 import { firstError, memberSchema, paymentSchema, type MemberInput } from "@/lib/validation";
 
@@ -138,6 +139,7 @@ export async function assignPlan(memberId: string, _prev: FormState, fd: FormDat
       await tx.$queryRaw`SELECT id FROM "Member" WHERE id = ${memberId} FOR UPDATE`;
       const member = await tx.member.findUnique({ where: { id: memberId } });
       if (!member || member.deletedAt) throw new DomainError("Socio no encontrado o dado de baja");
+      if (member.frozenSince) throw new DomainError("La membresía está congelada: descongélala antes de renovar");
 
       const current = member.currentEndDate ? isoFromDbDate(member.currentEndDate) : null;
       // El periodo arranca en la fecha real del pago (puede ser anterior a hoy).
@@ -232,4 +234,99 @@ export async function regenerateAccessCode(memberId: string): Promise<void> {
   await requireAdmin();
   await db.member.update({ where: { id: memberId }, data: { accessCode: newAccessCode() } });
   revalidatePath(`/socios/${memberId}`);
+}
+
+function revalidateMember(memberId: string) {
+  revalidatePath(`/socios/${memberId}`);
+  revalidatePath("/socios");
+  revalidatePath("/inicio");
+}
+
+/** Congela la membresía vigente desde hoy: no puede entrar y los días dejan de correr. */
+export async function freezeMember(memberId: string, _prev: FormState, fd: FormData): Promise<FormState> {
+  await requireAdmin();
+  const reason = String(fd.get("reason") ?? "").trim().slice(0, 200) || null;
+  const settings = await getSettings();
+  const today = await gymToday();
+  try {
+    await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Member" WHERE id = ${memberId} FOR UPDATE`;
+      const member = await tx.member.findUnique({ where: { id: memberId } });
+      if (!member) throw new DomainError("Socio no encontrado");
+      const { status } = computeStatus(statusInput(member), today, settings.expiringSoonDays);
+      if (!canFreeze(status)) throw new DomainError("Solo se puede congelar una membresía vigente");
+      await tx.member.update({
+        where: { id: memberId },
+        data: { frozenSince: dbDateFromIso(today), frozenReason: reason },
+      });
+    });
+  } catch (e) {
+    if (e instanceof DomainError) return { error: e.message };
+    throw e;
+  }
+  revalidateMember(memberId);
+  return { ok: "Membresía congelada" };
+}
+
+/**
+ * Descongela: corre el vencimiento (y las renovaciones adelantadas) tantos días
+ * como estuvo congelada, y deja el registro en el historial.
+ */
+export async function unfreezeMember(memberId: string): Promise<FormState> {
+  const user = await requireAdmin();
+  const today = await gymToday();
+  try {
+    const result = await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Member" WHERE id = ${memberId} FOR UPDATE`;
+      const member = await tx.member.findUnique({ where: { id: memberId } });
+      if (!member?.frozenSince) throw new DomainError("La membresía no está congelada");
+      const since = isoFromDbDate(member.frozenSince);
+      const days = frozenDays(since, today);
+
+      const affected = await tx.membership.findMany({
+        where: { memberId, voidedAt: null, endDate: { gte: member.frozenSince } },
+      });
+      for (const ms of affected) {
+        const shifted = shiftPeriod(
+          { startDate: isoFromDbDate(ms.startDate), endDate: isoFromDbDate(ms.endDate) },
+          since,
+          days,
+        );
+        await tx.membership.update({
+          where: { id: ms.id },
+          data: { startDate: dbDateFromIso(shifted.startDate), endDate: dbDateFromIso(shifted.endDate) },
+        });
+      }
+      const latest = await tx.membership.findFirst({
+        where: { memberId, voidedAt: null },
+        orderBy: { endDate: "desc" },
+      });
+      await tx.membershipFreeze.create({
+        data: {
+          memberId,
+          startDate: member.frozenSince,
+          endDate: dbDateFromIso(today),
+          days,
+          reason: member.frozenReason,
+          createdById: user.id,
+        },
+      });
+      await tx.member.update({
+        where: { id: memberId },
+        data: { frozenSince: null, frozenReason: null, currentEndDate: latest?.endDate ?? null },
+      });
+      return { days, endDate: latest ? isoFromDbDate(latest.endDate) : null };
+    });
+    revalidateMember(memberId);
+    const d = result.days;
+    return {
+      ok:
+        d === 0
+          ? "Membresía descongelada (mismo día, el vencimiento no cambia)"
+          : `Membresía descongelada: se corrió ${d} ${d === 1 ? "día" : "días"}, ahora vence el ${formatDate(result.endDate)}`,
+    };
+  } catch (e) {
+    if (e instanceof DomainError) return { error: e.message };
+    throw e;
+  }
 }
