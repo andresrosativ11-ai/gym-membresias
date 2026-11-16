@@ -31,12 +31,22 @@ export function parseFilter(value: string | undefined): MemberFilter {
   return MEMBER_FILTERS.includes(value as MemberFilter) ? (value as MemberFilter) : "todos";
 }
 
-/** Traduce un filtro de estado + texto de búsqueda a un WHERE de Prisma. */
+/** Acepta solo fechas "YYYY-MM-DD" válidas; cualquier otra cosa se ignora. */
+export function parseIsoParam(value: string | undefined): ISODate | undefined {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const d = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value ? value : undefined;
+}
+
+export type EnrolledRange = { from?: ISODate; to?: ISODate };
+
+/** Traduce un filtro de estado + texto de búsqueda + rango de inscripción a un WHERE de Prisma. */
 export function memberWhere(
   filter: MemberFilter,
   q: string | undefined,
   today: ISODate,
   expiringSoonDays: number,
+  enrolled: EnrolledRange = {},
 ): Prisma.MemberWhereInput {
   const t = dbDateFromIso(today);
   const soon = dbDateFromIso(addDays(today, expiringSoonDays));
@@ -52,6 +62,14 @@ export function memberWhere(
   };
 
   const and: Prisma.MemberWhereInput[] = [byFilter[filter]];
+  if (enrolled.from || enrolled.to) {
+    and.push({
+      enrolledAt: {
+        ...(enrolled.from && { gte: dbDateFromIso(enrolled.from) }),
+        ...(enrolled.to && { lte: dbDateFromIso(enrolled.to) }),
+      },
+    });
+  }
   // searchText ya está en minúsculas y sin acentos: "lop" encuentra "López".
   const terms = normalizeSearch(q ?? "").split(" ").filter(Boolean).slice(0, 5);
   for (const term of terms) {

@@ -2,9 +2,17 @@ import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import { StatusBadge } from "@/components/status-badge";
 import { db } from "@/lib/db";
-import { todayInTimeZone } from "@/lib/domain/dates";
+import { isoFromDbDate, todayInTimeZone } from "@/lib/domain/dates";
 import { formatDate } from "@/lib/format";
-import { FILTER_LABEL, MEMBER_FILTERS, memberView, memberWhere, parseFilter, type MemberFilter } from "@/lib/members";
+import {
+  FILTER_LABEL,
+  MEMBER_FILTERS,
+  memberView,
+  memberWhere,
+  parseFilter,
+  parseIsoParam,
+  type MemberFilter,
+} from "@/lib/members";
 import { requireUser } from "@/lib/session";
 import { getSettings } from "@/lib/settings";
 
@@ -13,7 +21,7 @@ const PAGE_SIZE = 30;
 export default async function SociosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; estado?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; estado?: string; page?: string; desde?: string; hasta?: string }>;
 }) {
   await requireUser();
   const sp = await searchParams;
@@ -23,8 +31,13 @@ export default async function SociosPage({
   const q = sp.q?.trim() ?? "";
   const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
   const soon = settings.expiringSoonDays;
+  let desde = parseIsoParam(sp.desde);
+  let hasta = parseIsoParam(sp.hasta);
+  if (desde && hasta && desde > hasta) [desde, hasta] = [hasta, desde];
+  const enrolled = { from: desde, to: hasta };
+  const hasDateFilter = Boolean(desde || hasta);
 
-  const where = memberWhere(filter, q, today, soon);
+  const where = memberWhere(filter, q, today, soon, enrolled);
   const [total, rows, counts] = await Promise.all([
     db.member.count({ where }),
     db.member.findMany({
@@ -33,16 +46,20 @@ export default async function SociosPage({
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
-    Promise.all(MEMBER_FILTERS.map((f) => db.member.count({ where: memberWhere(f, undefined, today, soon) }))),
+    Promise.all(MEMBER_FILTERS.map((f) => db.member.count({ where: memberWhere(f, undefined, today, soon, enrolled) }))),
   ]);
-  const members = rows.map((m) => memberView(m, today, soon));
+  const members = rows.map((m) => ({ ...memberView(m, today, soon), enrolledAt: isoFromDbDate(m.enrolledAt) }));
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const href = (params: { estado?: MemberFilter; page?: number }) => {
+  const href = (params: { estado?: MemberFilter; page?: number; sinFechas?: boolean }) => {
     const s = new URLSearchParams();
     const estado = params.estado ?? filter;
     if (estado !== "todos") s.set("estado", estado);
     if (q) s.set("q", q);
+    if (!params.sinFechas) {
+      if (desde) s.set("desde", desde);
+      if (hasta) s.set("hasta", hasta);
+    }
     if (params.page && params.page > 1) s.set("page", String(params.page));
     const qs = s.toString();
     return qs ? `/socios?${qs}` : "/socios";
@@ -59,6 +76,8 @@ export default async function SociosPage({
 
       <form className="flex gap-2" role="search">
         {filter !== "todos" && <input type="hidden" name="estado" value={filter} />}
+        {desde && <input type="hidden" name="desde" value={desde} />}
+        {hasta && <input type="hidden" name="hasta" value={hasta} />}
         <input
           type="search"
           name="q"
@@ -69,6 +88,39 @@ export default async function SociosPage({
         />
         <button className="btn-secondary">Buscar</button>
       </form>
+
+      <details open={hasDateFilter} className="rounded-xl border border-zinc-200 bg-white px-4 py-3">
+        <summary className="cursor-pointer text-sm font-medium text-zinc-700">
+          Fecha de inscripción
+          {hasDateFilter && (
+            <span className="ml-2 font-normal text-zinc-500">
+              {desde ? formatDate(desde) : "…"} – {hasta ? formatDate(hasta) : "…"}
+            </span>
+          )}
+        </summary>
+        <form className="mt-3 space-y-3">
+          {filter !== "todos" && <input type="hidden" name="estado" value={filter} />}
+          {q && <input type="hidden" name="q" value={q} />}
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="field-label">Desde</span>
+              <input type="date" name="desde" defaultValue={desde} max={today} className="field-input" />
+            </label>
+            <label className="block">
+              <span className="field-label">Hasta</span>
+              <input type="date" name="hasta" defaultValue={hasta} max={today} className="field-input" />
+            </label>
+          </div>
+          <div className="flex gap-2">
+            <button className="btn-secondary">Filtrar</button>
+            {hasDateFilter && (
+              <Link href={href({ sinFechas: true })} className="btn-secondary">
+                Quitar fechas
+              </Link>
+            )}
+          </div>
+        </form>
+      </details>
 
       <nav aria-label="Filtrar por estado" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
         {MEMBER_FILTERS.map((f, i) => (
@@ -96,7 +148,7 @@ export default async function SociosPage({
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{m.fullName}</p>
                   <p className="text-xs text-zinc-500">
-                    #{m.memberNumber} · vence {formatDate(m.endDate)}
+                    #{m.memberNumber} · inscrito {formatDate(m.enrolledAt)} · vence {formatDate(m.endDate)}
                   </p>
                 </div>
                 <StatusBadge status={m.status} daysLeft={m.daysLeft} />
