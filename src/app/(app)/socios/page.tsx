@@ -83,9 +83,14 @@ export default async function SociosPage({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Socios</h1>
-        <Link href="/socios/nuevo" className="btn-primary">
-          + Nuevo
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/socios/accesos" className="btn-secondary">
+            Enviar accesos
+          </Link>
+          <Link href="/socios/nuevo" className="btn-primary">
+            + Nuevo
+          </Link>
+        </div>
       </div>
 
       <form className="flex gap-2" role="search">

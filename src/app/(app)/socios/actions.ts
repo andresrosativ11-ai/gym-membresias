@@ -232,7 +232,11 @@ export async function setDeleted(memberId: string, deleted: boolean): Promise<vo
 
 export async function regenerateAccessCode(memberId: string): Promise<void> {
   await requireAdmin();
-  await db.member.update({ where: { id: memberId }, data: { accessCode: newAccessCode() } });
+  // El enlace anterior deja de servir: hay que volver a enviarle el acceso.
+  await db.member.update({
+    where: { id: memberId },
+    data: { accessCode: newAccessCode(), portalInviteSentAt: null },
+  });
   revalidatePath(`/socios/${memberId}`);
 }
 
@@ -329,4 +333,11 @@ export async function unfreezeMember(memberId: string): Promise<FormState> {
     if (e instanceof DomainError) return { error: e.message };
     throw e;
   }
+}
+
+/** Marca (o desmarca) que ya se le envió el enlace del portal al socio. */
+export async function markPortalInviteSent(memberId: string, sent: boolean): Promise<void> {
+  await requireUser();
+  await db.member.update({ where: { id: memberId }, data: { portalInviteSentAt: sent ? new Date() : null } });
+  revalidatePath("/socios/accesos");
 }

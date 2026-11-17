@@ -1,6 +1,5 @@
 /* eslint-disable @next/next/no-img-element -- QR en data URL */
 import Link from "next/link";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
 import { ActionForm, ConfirmButton, SubmitButton } from "@/components/action-form";
@@ -20,6 +19,7 @@ import {
   whatsappLink,
 } from "@/lib/format";
 import { memberView } from "@/lib/members";
+import { requestOrigin } from "@/lib/origin";
 import { requireUser } from "@/lib/session";
 import { getSettings } from "@/lib/settings";
 import {
@@ -31,6 +31,7 @@ import {
   setSuspended,
   voidLastMembership,
 } from "../actions";
+import { InviteButton } from "../accesos/invite-button";
 import { AssignPlanForm } from "./assign-plan-form";
 
 
@@ -75,10 +76,7 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
   ]);
   const sinceVisit = daysSinceVisit(lastVisit ? todayInTimeZone(settings.timezone, lastVisit.at) : null, today);
 
-  const h = await headers();
-  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-  const proto = h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  const portal = portalUrl(`${proto}://${host}`, m.accessCode);
+  const portal = portalUrl(await requestOrigin(), m.accessCode);
   const inviteLink = m.phone
     ? whatsappLink(m.phone, portalInviteMessage(m.firstName, settings.gymName, portal), settings.countryCode)
     : null;
@@ -175,9 +173,9 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
           </p>
           <div className="flex flex-wrap gap-2">
             {inviteLink ? (
-              <a href={inviteLink} target="_blank" rel="noopener noreferrer" className="btn-primary">
+              <InviteButton memberId={id} href={inviteLink} className="btn-primary">
                 Enviar acceso por WhatsApp
-              </a>
+              </InviteButton>
             ) : (
               <span className="text-zinc-500">Agrega un teléfono para enviarlo por WhatsApp.</span>
             )}
@@ -186,6 +184,11 @@ export default async function SocioPage({ params }: { params: Promise<{ id: stri
             </a>
           </div>
           <p className="break-all rounded bg-zinc-50 p-2 font-mono text-xs text-zinc-600 select-all">{portal}</p>
+          <p className="text-xs text-zinc-500">
+            {m.portalInviteSentAt
+              ? `Acceso enviado el ${formatDateTime(m.portalInviteSentAt, settings.timezone)}`
+              : "Aún no se le ha enviado el acceso."}
+          </p>
         </section>
       )}
 

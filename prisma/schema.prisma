@@ -81,6 +81,8 @@ model Member {
   /// Membresía congelada desde esta fecha (los días no corren hasta descongelar).
   frozenSince    DateTime? @db.Date
   frozenReason   String?
+  /// Última vez que se le envió el enlace del portal (por WhatsApp manual).
+  portalInviteSentAt DateTime?
   /// Baja lógica.
   deletedAt      DateTime?
   /// Desnormalizado: fin de la membresía más reciente (para filtros rápidos).
